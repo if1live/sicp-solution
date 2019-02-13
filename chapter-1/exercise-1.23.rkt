@@ -6,10 +6,11 @@
 
 (define (next a)
  (if (= (remainder a 2) 0) (+ a 1) (+ a 2)))
-    (define (find-divisor n test-divisor)
-     (cond ((> (square test-divisor) n) n)
-      ((divides? test-divisor n) test-divisor)
-      (else (find-divisor n (next test-divisor)))))
+
+(define (find-divisor n test-divisor)
+  (cond ((> (square test-divisor) n) n)
+  ((divides? test-divisor n) test-divisor)
+  (else (find-divisor n (next test-divisor)))))
 
 (define (divides? a b)
  (= (remainder b a) 0))
@@ -19,7 +20,7 @@
 
 (define (square x) (* x x))
 
-(define (runtime) 
+(define (runtime)
  (current-inexact-milliseconds))
 
 (define (timed-prime-test n)
