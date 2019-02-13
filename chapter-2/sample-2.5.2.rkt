@@ -1,29 +1,13 @@
 #!/usr/bin/env racket
 #lang racket
 
-;; http://uents.hatenablog.com/entry/sicp/020-ch2.4.3.1.md
-(define *op-table* (make-hash))
-
-(define (put op type item)
-  (if (not (hash-has-key? *op-table* op))
-        (hash-set! *op-table* op (make-hash))
-              true)
-    (hash-set! (hash-ref *op-table* op) type item))
-
-(define (get op type)
-    (if (hash-has-key? *op-table* op)
-          (if (hash-has-key? (hash-ref *op-table* op) type)
-                    (hash-ref (hash-ref *op-table* op) type)
-                              #f)
-                #f))
+(require "../lib-common.rkt")
 
 (define (put-coercion from-type to-type item)
   (put 'coercion '(coercion from-type to-type) item))
 
 (define (get-coercion from-type to-type)
   (get 'coercion '(coercion from-type to-type)))
-
-(define (square x) (* x x))
 
 (define (attach-tag type-tag contents)
   (cons type-tag contents))
@@ -87,10 +71,10 @@
   (define (make-from-real-imag x y) (cons x y))
 
   (define (magnitude z)
-    (sqrt (+ (square (real-part z)) 
+    (sqrt (+ (square (real-part z))
              (square (imag-part z)))))
   (define (angle z)
-    (atan (imag-part z) 
+    (atan (imag-part z)
           (real-part z)))
   (define (make-from-mag-ang r a)
     (cons (* r (cos a)) (* r (sin a))))
