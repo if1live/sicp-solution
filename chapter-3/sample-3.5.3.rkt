@@ -87,3 +87,24 @@
                  (add-streams (scale-stream integrand dt)
                               int)))
   int)
+
+;(define (solve-err f y0 dt)
+;  (define y (integral dy y0 dt))
+;  (define dy (stream-map f y))
+;  y)
+;(solve-err (lambda (y) (* y y)) 1 0.1)
+
+(define (integral-delayed delayed-integrand initial-value dt)
+  (define int
+    (cons-stream initial-value
+                 (let ((integrand (force delayed-integrand)))
+                   (add-streams (scale-stream integrand dt)
+                                int))))
+  int)
+
+(define (solve f y0 dt)
+  (define y (integral-delayed (delay dy) y0 dt))
+  (define dy (stream-map f y))
+  y)
+; dy/dt=y
+(stream-ref (solve (lambda (y) y) 1 0.001) 1000)
