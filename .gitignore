@@ -3,3 +3,4 @@
 *.dep
 *.zo
 test.rkt
+compiled
