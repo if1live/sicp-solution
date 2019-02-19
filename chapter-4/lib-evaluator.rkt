@@ -29,6 +29,7 @@
         ((or? exp) (my-eval (or->if exp) env))
         ((let? exp) (my-eval (let->combination exp) env))
         ((let*? exp) (my-eval (let*->nested-lets exp) env))
+        ((do? exp) (my-eval (do->lambda exp) env))
         ((application? exp)
          (my-apply (my-eval (operator exp) env)
                    (list-of-values (operands exp) env)))
@@ -192,8 +193,8 @@
           (list (list 'test (cond-predicate first)))
           (make-if 'test
                    (list (cond-recipient first) 'test)
-                   (expand-clauses rest))))             
-  
+                   (expand-clauses rest))))
+
   (if (null? clauses)
       'false
       (let ((first (car clauses))
@@ -245,9 +246,6 @@
 ; (or)
 ;;;;;;;;;;;;;;
 
-; TODO exercise-4.5
-;;;;;;;;;;;;;;
-
 ; exercise-4.6
 (define (let? exp) (tagged-list? exp 'let))
 (define (let-body exp) (cddr exp))
@@ -273,14 +271,14 @@
     (cond ((let? body) (list 'let (list (list var exp)) body))
           ((= (length body) 1) (list 'let (list (list var exp)) (car body)))
           (else (append '(let) (list (list (list var exp))) body))))
-  
+
   (define (make-inner-let vars exps body)
     (if (null? vars)
         body
         (make-let (car vars)
                   (car exps)
                   (make-inner-let (cdr vars) (cdr exps) body))))
-  
+
   (let ((clauses (let-clauses exp))
         (body (let-body exp)))
     (let ((vars (map let-variable clauses))
@@ -325,6 +323,48 @@
 
 ; TODO exercise-4.9
 ; do/for/while/until
+
+(define (do? exp) (tagged-list? exp 'do))
+(define (do-bindings exp) (cadr exp))
+(define (do-clause exp) (caddr exp))
+(define (do-body exp) (cdddr exp))
+
+(define (binding-variable binding) (car binding))
+(define (binding-init binding) (cadr binding))
+(define (binding-step binding) (caddr binding))
+
+(define (clause-test clause) (car clause))
+(define (clause-expression clause) (cdr clause))
+
+(define (do->lambda exp)
+  (define loop-name 'iter)
+  (define (make-consequent body steps)
+    (append body
+            (list (append (list loop-name) steps))))
+  (define (make-alternative body)
+    (sequence->exp body))
+  
+  (let ((bindings (do-bindings exp))
+        (clause (do-clause exp))
+        (body (do-body exp)))
+    (let ((vars (map binding-variable bindings))
+          (inits (map binding-init bindings))
+          (steps (map binding-step bindings))
+          (test (clause-test clause))
+          (else-exp (clause-expression clause)))
+
+      (list
+       (list 'lambda
+             '()
+             (list 'define (append (list loop-name) vars)
+                   (list 'if test
+                         (sequence->exp (make-alternative else-exp))
+                         (sequence->exp (make-consequent body steps))))
+             (append (list loop-name) inits))))))
+
+;(do ((i 0 (+ i 1)))
+;  ((> i 3) (display (+ i 100)))
+;  (display i))
 ;;;;;;;;;;;;;;
 
 (define (true? x)
@@ -424,6 +464,8 @@
         (list '- -)
         (list '* *)
         (list '/ /)
+        (list '> >)
+        (list '< <)
         ; exercise-4.14
         ; (list 'map map)
         ))
