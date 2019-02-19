@@ -54,7 +54,7 @@
                   (count n))
      (if (= count 0)
          b
-         (fib-iter (+ a b) a (+ count 1)))))
+         (fib-iter (+ a b) a (- count 1)))))
 (let->combinations A)
 
 ;(define n 4)
