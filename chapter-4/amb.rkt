@@ -32,6 +32,7 @@
         ((lambda? exp) (analyze-lambda exp))
         ((begin? exp) (analyze-sequence (begin-actions exp)))
         ((cond? exp) (analyze (cond->if exp)))
+        ((let? exp) (analyze (let->combination exp)))
         ((application? exp) (analyze-application exp))
         (else
          (error "Unknown expression type -- ANALYZE" exp))))
@@ -288,6 +289,22 @@
                      (sequence->exp (cond-actions first))
                      (expand-clauses rest))))))
 
+; exercise-4.22
+(define (let? exp) (tagged-list? exp 'let))
+(define (let-body exp) (cddr exp))
+(define (let-clauses exp) (cadr exp))
+(define (let-variable clause) (car clause))
+(define (let-expression clause) (cadr clause))
+
+(define (let->combination exp)
+  (define (make-lambda vars body exps)
+    (append (list (list 'lambda vars body)) exps))
+  (let ((clauses (let-clauses exp))
+        (body (let-body exp)))
+    (let ((vars (map let-variable clauses))
+          (exps (map let-expression clauses)))
+      (make-lambda vars (make-begin body) exps))))
+
 ;; 4.1.3: Evaluator Data Structures
 ;; --------------------------------
 
@@ -420,6 +437,10 @@
         (list 'null? null?)
         (list 'not not)
         (list 'list list)
+        (list 'remainder remainder)
+        (list '= =)
+        (list '> >)
+        (list '< <)
         (list '+ +)
         (list '- -)
         (list '* *)

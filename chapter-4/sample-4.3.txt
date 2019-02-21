@@ -1,0 +1,42 @@
+(list (amb 1 2 3) (amb 'a 'b))
+try-again
+try-again
+...
+
+
+
+(define (square x) (* x x))
+
+(define (smallest-divisor n)
+ (find-divisor n 2))
+
+(define (next a)
+ (if (= (remainder a 2) 0) (+ a 1) (+ a 2)))
+
+(define (find-divisor n test-divisor)
+  (cond ((> (square test-divisor) n) n)
+  ((divides? test-divisor n) test-divisor)
+  (else (find-divisor n (next test-divisor)))))
+
+(define (divides? a b)
+ (= (remainder b a) 0))
+
+(define (prime? n)
+ (= n (smallest-divisor n)))
+
+; amb.rkt 안에 구현되어있음
+;(define (require p)
+;  (if (not p) (amb) false))
+
+; amb.rkt 안에 구현되어있음
+;(define (an-element-of items)
+;  (require (not (null? items)))
+;  (amb (car items) (an-element-of (cdr items))))
+
+(define (prime-sum-pair list1 list2)
+  (let ((a (an-element-of list1))
+        (b (an-element-of list2)))
+    (require (prime? (+ a b)))
+    (list a b)))
+
+(prime-sum-pair '(1 3 5 8) '(20 35 110))
