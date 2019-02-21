@@ -25,11 +25,6 @@
         ((begin? exp)
          (eval-sequence (begin-actions exp) env))
         ((cond? exp) (my-eval (cond->if exp) env))
-        ((and? exp) (my-eval (and->if exp) env))
-        ((or? exp) (my-eval (or->if exp) env))
-        ((let? exp) (my-eval (let->combination exp) env))
-        ((let*? exp) (my-eval (let*->nested-lets exp) env))
-        ((do? exp) (my-eval (do->lambda exp) env))
         ((application? exp)
          (my-apply (my-eval (operator exp) env)
                    (list-of-values (operands exp) env)))
@@ -152,49 +147,17 @@
 (define (first-operand ops) (car ops))
 (define (rest-operands ops) (cdr ops))
 
-; basic + exercise-4.5
 (define (cond? exp) (tagged-list? exp 'cond))
 (define (cond-clauses exp) (cdr exp))
 (define (cond-else-clause? clause)
   (eq? (cond-predicate clause) 'else))
 (define (cond-predicate clause) (car clause))
-(define (cond-actions clause)
-  (if (cond-=>? clause)
-      (cddr clause)
-      (cdr clause)))
-(define (cond-=>? clause) (eq? (cadr clause) '=>))
-(define (cond-recipient clause) (car (cond-actions clause)))
+(define (cond-actions clause) (cdr clause))
 
 (define (cond->if exp)
   (expand-clauses (cond-clauses exp)))
 
-;(define (expand-clauses clauses)
-;  (if (null? clauses)
-;      'false
-;      (let ((first (car clauses))
-;            (rest (cdr clauses)))
-;        (if (cond-else-clause? first)
-;            (if (null? rest)
-;                (sequence->exp (cond-actions first))
-;                (error "ELSE clause isn't last -- COND-IF" clauses))
-;            (make-if (cond-predicate first)
-;                     (sequence->exp (cond-actions first))
-;                     (expand-clauses rest))))))
-
-; exercise-4.5
 (define (expand-clauses clauses)
-  (define (make-simple-if first rest)
-    (make-if (cond-predicate first)
-             (sequence->exp (cond-actions first))
-             (expand-clauses rest)))
-
-  (define (make-recipient-if first rest)
-    (list 'let
-          (list (list 'test (cond-predicate first)))
-          (make-if 'test
-                   (list (cond-recipient first) 'test)
-                   (expand-clauses rest))))
-
   (if (null? clauses)
       'false
       (let ((first (car clauses))
@@ -203,200 +166,9 @@
             (if (null? rest)
                 (sequence->exp (cond-actions first))
                 (error "ELSE clause isn't last -- COND-IF" clauses))
-            (if (cond-=>? first)
-                (make-recipient-if first rest)
-                (make-simple-if first rest))))))
-
-;(cond (true 1)
-;      (false 2)
-;      (else 4)))
-
-;(cond ((assoc 'b '((a 1) (b 2))) => cadr)
-;      (else false)))
-;;;;;;;;;;;;;;
-
-; exercise-4.4
-(define (and? exp) (tagged-list? exp 'and))
-(define (and->if exp) (expand-and (cdr exp)))
-
-(define (expand-and ops)
-  (if (null? ops)
-      'true
-      (let ((first (car ops))
-            (rest (cdr ops)))
-        (make-if first
-                 (expand-and rest)
-                 'false))))
-
-(define (or? exp) (tagged-list? exp 'or))
-(define (or->if exp) (expand-or (cdr exp)))
-
-(define (expand-or ops)
-  (if (null? ops)
-      'false
-      (let ((first (car ops))
-            (rest (cdr ops)))
-        (make-if first
-                 'true
-                 (expand-or rest)))))
-
-; (and ((lambda () (display 'first) false))  ((lambda () (display 'second) true)))
-; (or ((lambda () (display 'first) true)) ((lambda () (display 'second) false)))
-; (and)
-; (or)
-;;;;;;;;;;;;;;
-
-; exercise-4.6
-(define (let? exp) (tagged-list? exp 'let))
-(define (let-body exp) (cddr exp))
-(define (let-clauses exp) (cadr exp))
-(define (let-variable clause) (car clause))
-(define (let-expression clause) (cadr clause))
-(define (make-lambda-with-call vars body exps)
-  (append (list (list 'lambda vars body)) exps))
-
-(define (simplelet->combination exp)
-  (let ((clauses (let-clauses exp))
-        (body (let-body exp)))
-    (let ((vars (map let-variable clauses))
-          (exps (map let-expression clauses)))
-      (make-lambda-with-call vars (make-begin body) exps))))
-; (let ((a 1) (b 2) (c 3))  (display a) (+ a b c))
-;;;;;;;;;;;;;;
-
-; exercise-4.7
-(define (let*? exp) (tagged-list? exp 'let*))
-(define (let*->nested-lets exp)
-  (define (make-let var exp body)
-    (cond ((let? body) (list 'let (list (list var exp)) body))
-          ((= (length body) 1) (list 'let (list (list var exp)) (car body)))
-          (else (append '(let) (list (list (list var exp))) body))))
-
-  (define (make-inner-let vars exps body)
-    (if (null? vars)
-        body
-        (make-let (car vars)
-                  (car exps)
-                  (make-inner-let (cdr vars) (cdr exps) body))))
-
-  (let ((clauses (let-clauses exp))
-        (body (let-body exp)))
-    (let ((vars (map let-variable clauses))
-          (exps (map let-expression clauses)))
-      (make-inner-let vars exps body))))
-; (let* ((x 3) (y (+ x 2)) (z (+ x y 5))) (* x z))
-;;;;;;;;;;;;;;
-
-; exercise-4.8
-(define (namedlet-var exp) (cadr exp))
-(define (namedlet-bindings exp) (caddr exp))
-(define (namedlet-body exp) (cdddr exp))
-(define (bindings-var b) (car b))
-(define (bindings-exp b) (cadr b))
-
-(define (namedlet->combination exp)
-  (let ((var (namedlet-var exp))
-        (bindings (namedlet-bindings exp))
-        (body (namedlet-body exp)))
-    (let ((vars (map bindings-var bindings))
-          (exps (map bindings-exp bindings)))
-      (list
-       'begin
-       (append '(define)
-             (list (append (list var) vars))
-             body)
-       (append (list var) exps)))))
-
-(define (let->combination exp)
-  (if (pair? (cadr exp))
-      (simplelet->combination exp)
-      (namedlet->combination exp)))
-
-;(define (fib n)
-;    (let fib-iter ((a 1)
-;                  (b 0)
-;                  (count n))
-;     (if (= count 0)
-;         b
-;         (fib-iter (+ a b) a (- count 1)))))
-;;;;;;;;;;;;;;
-
-; TODO exercise-4.9
-; do/for/while/until
-
-(define (do? exp) (tagged-list? exp 'do))
-(define (do-bindings exp) (cadr exp))
-(define (do-clause exp) (caddr exp))
-(define (do-body exp) (cdddr exp))
-
-(define (binding-variable binding) (car binding))
-(define (binding-init binding) (cadr binding))
-(define (binding-step binding) (caddr binding))
-
-(define (clause-test clause) (car clause))
-(define (clause-expression clause) (cdr clause))
-
-(define (do->lambda exp)
-  (define loop-name 'iter)
-  (define (make-consequent body steps)
-    (append body
-            (list (append (list loop-name) steps))))
-  (define (make-alternative body)
-    (sequence->exp body))
-
-  (let ((bindings (do-bindings exp))
-        (clause (do-clause exp))
-        (body (do-body exp)))
-    (let ((vars (map binding-variable bindings))
-          (inits (map binding-init bindings))
-          (steps (map binding-step bindings))
-          (test (clause-test clause))
-          (else-exp (clause-expression clause)))
-
-      (list
-       (list 'lambda
-             '()
-             (list 'define (append (list loop-name) vars)
-                   (list 'if test
-                         (sequence->exp (make-alternative else-exp))
-                         (sequence->exp (make-consequent body steps))))
-             (append (list loop-name) inits))))))
-
-;(do ((i 0 (+ i 1)))
-;  ((> i 3) (display (+ i 100)))
-;  (display i))
-;;;;;;;;;;;;;;
-
-; exercise-4.16
-(define (filter proc items)
-  (cond ((null? items) '())
-        ((proc (car items)) (cons (car items) (filter proc (cdr items))))
-        (else (filter proc (cdr items)))))
-
-(define (body-defines exps) (filter definition? exps))
-(define (body-exps exps) (filter (lambda (x) (not (definition? x))) exps))
-
-(define (scan-out-defines exp)
-  (let ((definitions (body-defines exp))
-        (inner-body (body-exps exp)))
-    (if (= (length definitions) 0)
-        exp
-        (let ((let-vars (map (lambda (exp)
-                               (list (definition-variable exp) '*unassigned*))
-                             definitions))
-              (let-sets (map (lambda (exp)
-                               (list 'set! (definition-variable exp) (definition-value exp)))
-                             definitions)))
-          (list (append (list 'let let-vars)
-                        (append let-sets inner-body)))))))
-;(scan-out-defines
-; (lambda-body
-;  '(lambda (a b)
-;     (define u (+ 1 2))
-;     (define v (+ 3 4))
-;     (display u)
-;     (display v))))
-;;;;;;;;;;;
+            (make-if (cond-predicate first)
+                     (sequence->exp (cond-actions first))
+                     (expand-clauses rest))))))
 
 (define (true? x)
   (not (eq? x false)))
@@ -404,7 +176,7 @@
   (eq? x false))
 
 (define (make-procedure parameters body env)
-  (list 'procedure parameters (scan-out-defines body) env))
+  (list 'procedure parameters body env))
 
 (define (compound-procedure? p)
   (tagged-list? p 'procedure))
@@ -434,11 +206,6 @@
           (error "too few arguments supplied" vars vals))))
 
 (define (lookup-variable-value var env)
-  (define (unassigned-var? var exp)
-    (and (not (eq? var '*unassigned*))
-         (primitive-procedure? exp)
-         (eq? (primitive-implementation exp) '*unassigned*)))
-  
   (define (env-loop env)
     (define (scan vars vals)
       (cond ((null? vars)
@@ -451,11 +218,7 @@
         (let ((frame (first-frame env)))
           (scan (frame-variables frame)
                 (frame-values frame)))))
-  ; exercise 4.16.a
-  (let ((found (env-loop env)))
-    (if (unassigned-var? var found)
-        (error "access unassigned value --" var)
-        found)))
+  (env-loop env))
 
 (define (set-variable-value! var val env)
   (define (env-loop env)
@@ -499,8 +262,6 @@
         (list 'display display)
         (list 'assoc assoc)
         (list 'eq? eq?)
-        ; exercise-4.16.a
-        (list '*unassigned* '*unassigned*)
         (list '= =)
         (list '+ +)
         (list '- -)
@@ -508,8 +269,6 @@
         (list '/ /)
         (list '> >)
         (list '< <)
-        ; exercise-4.14
-        ; (list 'map map)
         ))
 
 (define (primitive-procedure-names)
